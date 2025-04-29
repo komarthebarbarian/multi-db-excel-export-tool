@@ -1,103 +1,92 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
+import JSZip from 'jszip';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [sokojUrl, setSokojUrl] = useState(null);
+  const [ofpsUrl, setOfpsUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [fileCount, setFileCount] = useState(0);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
+  const handleUpload = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setSokojUrl(null);
+    setOfpsUrl(null);
+
+    const formData = new FormData(e.target);
+    const res = await fetch('/api/process', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const blob = await res.blob();
+    const zip = await JSZip.loadAsync(blob);
+    const sokoj = await zip.file('sokoj.xlsx').async('blob');
+    const ofps = await zip.file('ofps.xlsx').async('blob');
+    setSokojUrl(window.URL.createObjectURL(sokoj));
+    setOfpsUrl(window.URL.createObjectURL(ofps));
+    setLoading(false);
+  };
+
+  const handleFileChange = (e) => {
+    setFileCount(e.target.files.length);
+  };
+
+  return (
+    <main className="flex flex-col max-w-2xl mx-auto p-6 space-y-6">
+      <form onSubmit={handleUpload} encType="multipart/form-data" className="flex flex-col items-center space-y-4">
+        <label className="block text-xl font-medium mb-6">СОКОЈ и ОФПС</label>
+
+        {/* Sakriven input */}
+        <input
+          id="fileInput"
+          type="file"
+          name="dbfiles"
+          multiple
+          accept=".db"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+
+        {/* Vidljivo dugme za input */}
+        <label
+          htmlFor="fileInput"
+          className="cursor-pointer inline-block px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
+        >
+          Унесите .db фајлове
+        </label>
+
+        {/* Status izabranih fajlova */}
+        <div className="text-sm text-gray-600">
+          {fileCount === 0 ? 'Нема унетих фајлова' : `${fileCount} унето`}
+        </div>
+
+        <button
+          type="submit"
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+        >
+          {loading ? 'Обрађујем...' : 'Конвертуј'}
+        </button>
+      </form>
+
+      {loading && (
+        <div className="flex justify-center">
+          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+        </div>
+      )}
+
+      {!loading && sokojUrl && ofpsUrl && (
+        <div className="flex items-center justify-evenly">
+          <a href={sokojUrl} download="sokoj.xlsx" className="text-green-600 hover:underline">
+            СОКОЈ
           </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
+          <a href={ofpsUrl} download="ofps.xlsx" className="text-green-600 hover:underline ">
+            ОФПС
           </a>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      )}
+    </main>
   );
 }
