@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import JSZip from 'jszip';
 
 export default function Home() {
   const [sokojUrl, setSokojUrl] = useState(null);
@@ -21,12 +20,19 @@ export default function Home() {
       body: formData,
     });
 
-    const blob = await res.blob();
-    const zip = await JSZip.loadAsync(blob);
-    const sokoj = await zip.file('sokoj.xlsx').async('blob');
-    const ofps = await zip.file('ofps.xlsx').async('blob');
-    setSokojUrl(window.URL.createObjectURL(sokoj));
-    setOfpsUrl(window.URL.createObjectURL(ofps));
+    const result = await res.json();
+
+    const toBlobUrl = (base64, type) => {
+      const binary = atob(base64);
+      const array = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        array[i] = binary.charCodeAt(i);
+      }
+      return URL.createObjectURL(new Blob([array], { type }));
+    };
+
+    setSokojUrl(toBlobUrl(result.sokoj, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'));
+    setOfpsUrl(toBlobUrl(result.ofps, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'));
     setLoading(false);
   };
 
@@ -39,7 +45,6 @@ export default function Home() {
       <form onSubmit={handleUpload} encType="multipart/form-data" className="flex flex-col items-center space-y-4">
         <label className="block text-xl font-medium mb-6">СОКОЈ и ОФПС</label>
 
-        {/* Sakriven input */}
         <input
           id="fileInput"
           type="file"
@@ -50,7 +55,6 @@ export default function Home() {
           className="hidden"
         />
 
-        {/* Vidljivo dugme za input */}
         <label
           htmlFor="fileInput"
           className="cursor-pointer inline-block px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition"
@@ -58,7 +62,6 @@ export default function Home() {
           Унесите .db фајлове
         </label>
 
-        {/* Status izabranih fajlova */}
         <div className="text-sm text-gray-600">
           {fileCount === 0 ? 'Нема унетих фајлова' : `${fileCount} унето`}
         </div>

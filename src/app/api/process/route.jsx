@@ -3,7 +3,6 @@ import path from 'path';
 import { tmpdir } from 'os';
 import { v4 as uuidv4 } from 'uuid';
 import ExcelJS from 'exceljs';
-import JSZip from 'jszip';
 import Database from 'better-sqlite3';
 
 export async function POST(req) {
@@ -20,10 +19,8 @@ export async function POST(req) {
 
     const db = new Database(tempPath);
 
-    const stmt = db.prepare("SELECT ts, message FROM log WHERE action = 'start' ORDER BY ts ASC");
+    const stmt = db.prepare("SELECT ts, message, duration FROM log WHERE action = 'start' ORDER BY ts ASC");
     const allLogs = stmt.all();
-
-    let lastSongKey = '';
 
     for (let i = 0; i < allLogs.length; i++) {
       const row = allLogs[i];
@@ -39,21 +36,8 @@ export async function POST(req) {
         performer = performer.replace(/^[A-Za-z]?\s?\d{2,4}\s*/, '').trim();
       }
 
-      let duration = '';
-      if (i + 1 < allLogs.length) {
-        const nextTs = new Date(allLogs[i + 1].ts);
-        duration = Math.floor((nextTs - ts) / 1000);
-      }
-
-      // Preskoci ukoliko je pesma kraca od 20 sekundi
+      const duration = parseInt(row.duration);
       if (!duration || duration < 20) continue;
-
-      // Napravi songKey za svaku pesmu
-      const songKey = `${performer.toLowerCase()} - ${title.toLowerCase()}`;
-
-      // Preskoci ukoliko je ista pesma kao i prethodna
-      if (songKey === lastSongKey) continue;
-      lastSongKey = songKey; // Update lastSongKey
 
       rows.push({
         date: `${ts.getDate().toString().padStart(2, '0')}/${(ts.getMonth() + 1).toString().padStart(2, '0')}/${ts.getFullYear()}`,
@@ -68,9 +52,6 @@ export async function POST(req) {
     await fs.unlink(tempPath);
   }
 
-  const zip = new JSZip();
-
-  // === SOKOJ Excel ===
   const sokojWorkbook = new ExcelJS.Workbook();
   const sokojSheet = sokojWorkbook.addWorksheet('Sokoj RADIO kosuljica');
   sokojSheet.columns = [
@@ -81,22 +62,18 @@ export async function POST(req) {
     { header: 'Naziv dela', key: 'title' },
     { header: 'Autor', key: 'empty2' },
     { header: 'Trajanje dela', key: 'duration' },
-    { header: 'Način upotrebe dela (prazno, A ili K)', key: 'empty4' },
+    { header: 'Način upotrebe dela (prazно, A ili K)', key: 'empty4' },
     { header: 'Napomena', key: 'empty5' },
   ];
   rows.forEach(r => sokojSheet.addRow({ ...r, empty1: '', empty2: '', empty4: '', empty5: '' }));
   const sokojBuffer = await sokojWorkbook.xlsx.writeBuffer();
-  zip.file('sokoj.xlsx', sokojBuffer);
 
-  // === OFPS Excel ===
   const ofpsWorkbook = new ExcelJS.Workbook();
   const ofpsSheet = ofpsWorkbook.addWorksheet('Fonogrami');
 
-  // Heading tekst za OFPS
   ofpsSheet.mergeCells('A1:H1');
   ofpsSheet.getCell('A1').value = `Unos podataka o emitovanim fonogramima preko Excel-a\nOBRAZAC ZA PRIJAVU EMITOVANIH FONOGRAMA\nEMITER:`;
 
-  // Header OFPS
   ofpsSheet.addRow([
     'Vreme emitovanja fonograma',
     'Datum',
@@ -121,15 +98,14 @@ export async function POST(req) {
     ]);
   });
 
-  const ofpsBuffer = await ofpsWorkbook.xlsx.writeBuffer();
-  zip.file('ofps.xlsx', ofpsBuffer);
+  const result = {
+    sokoj: Buffer.from(sokojBuffer).toString('base64'),
+    ofps: Buffer.from(await ofpsWorkbook.xlsx.writeBuffer()).toString('base64'),
+  };
 
-  const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
-
-  return new Response(zipBuffer, {
+  return new Response(JSON.stringify(result), {
     headers: {
-      'Content-Type': 'application/zip',
-      'Content-Disposition': 'attachment; filename="reports.zip"',
-    },
+      'Content-Type': 'application/json'
+    }
   });
 }
