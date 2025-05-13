@@ -43,7 +43,7 @@ export default function Home() {
   return (
     <main className="flex flex-col max-w-2xl mx-auto p-6 space-y-6">
       <form onSubmit={handleUpload} encType="multipart/form-data" className="flex flex-col items-center space-y-4">
-        <label className="block text-xl font-medium mb-6">СОКОЈ и ОФПС</label>
+        <label className="block text-xl font-medium mb-6">Кошуљице за СОКОЈ и ОФПС</label>
 
         <input
           id="fileInput"
